@@ -1,0 +1,32 @@
+"use strict";
+var __importDefault = (this && this.__importDefault) || function (mod) {
+    return (mod && mod.__esModule) ? mod : { "default": mod };
+};
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.DEFAULT_TEST_BUNDLE_SUFFIX = exports.WDA_RUNNER_BUNDLE_ID_FOR_XCTEST = exports.WDA_UPGRADE_TIMESTAMP_PATH = exports.WDA_BASE_URL = exports.SDK_DEVICE = exports.SDK_SIMULATOR = exports.PLATFORM_NAME_IOS = exports.PLATFORM_NAME_TVOS = exports.WDA_SCHEME = exports.PROJECT_FILE = exports.WDA_RUNNER_APP = exports.WDA_RUNNER_BUNDLE_ID = void 0;
+const path_1 = __importDefault(require("path"));
+const DEFAULT_TEST_BUNDLE_SUFFIX = '.xctrunner';
+exports.DEFAULT_TEST_BUNDLE_SUFFIX = DEFAULT_TEST_BUNDLE_SUFFIX;
+const WDA_RUNNER_BUNDLE_ID = 'com.facebook.WebDriverAgentRunner';
+exports.WDA_RUNNER_BUNDLE_ID = WDA_RUNNER_BUNDLE_ID;
+const WDA_RUNNER_BUNDLE_ID_FOR_XCTEST = `${WDA_RUNNER_BUNDLE_ID}${DEFAULT_TEST_BUNDLE_SUFFIX}`;
+exports.WDA_RUNNER_BUNDLE_ID_FOR_XCTEST = WDA_RUNNER_BUNDLE_ID_FOR_XCTEST;
+const WDA_RUNNER_APP = 'WebDriverAgentRunner-Runner.app';
+exports.WDA_RUNNER_APP = WDA_RUNNER_APP;
+const WDA_SCHEME = 'WebDriverAgentRunner';
+exports.WDA_SCHEME = WDA_SCHEME;
+const PROJECT_FILE = 'project.pbxproj';
+exports.PROJECT_FILE = PROJECT_FILE;
+const WDA_BASE_URL = 'http://127.0.0.1';
+exports.WDA_BASE_URL = WDA_BASE_URL;
+const PLATFORM_NAME_TVOS = 'tvOS';
+exports.PLATFORM_NAME_TVOS = PLATFORM_NAME_TVOS;
+const PLATFORM_NAME_IOS = 'iOS';
+exports.PLATFORM_NAME_IOS = PLATFORM_NAME_IOS;
+const SDK_SIMULATOR = 'iphonesimulator';
+exports.SDK_SIMULATOR = SDK_SIMULATOR;
+const SDK_DEVICE = 'iphoneos';
+exports.SDK_DEVICE = SDK_DEVICE;
+const WDA_UPGRADE_TIMESTAMP_PATH = path_1.default.join('.appium', 'webdriveragent', 'upgrade.time');
+exports.WDA_UPGRADE_TIMESTAMP_PATH = WDA_UPGRADE_TIMESTAMP_PATH;
+//# sourceMappingURL=constants.js.map

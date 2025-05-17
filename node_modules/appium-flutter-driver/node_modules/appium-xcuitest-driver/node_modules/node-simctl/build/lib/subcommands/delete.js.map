@@ -1,0 +1,1 @@
+{"version":3,"file":"delete.js","sourceRoot":"","sources":["../../../lib/subcommands/delete.js"],"names":[],"mappings":";;AAAA,MAAM,QAAQ,GAAG,EAAE,CAAC;AAEpB;;;;;;;GAOG;AACH,QAAQ,CAAC,YAAY,GAAG,KAAK,UAAU,YAAY;IACjD,MAAM,IAAI,CAAC,IAAI,CAAC,QAAQ,EAAE;QACxB,IAAI,EAAE,CAAC,IAAI,CAAC,WAAW,CAAC,QAAQ,CAAC,CAAC;KACnC,CAAC,CAAC;AACL,CAAC,CAAC;AAEF,kBAAe,QAAQ,CAAC"}

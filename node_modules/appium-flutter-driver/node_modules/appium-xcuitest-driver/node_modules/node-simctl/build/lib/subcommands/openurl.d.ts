@@ -1,0 +1,18 @@
+export default commands;
+declare namespace commands {
+    /**
+     * Open URL scheme on Simulator. iOS will automatically try
+     * to find a matching application, which supports the given scheme.
+     * It is required that Simulator is in _booted_ state.
+     *
+     * @this {import('../simctl').Simctl}
+     * @param {string} url - The URL scheme to open, for example http://appiom.io
+     *                       will be opened by the built-in mobile browser.
+     * @return {Promise<import('teen_process').TeenProcessExecResult>} Command execution result.
+     * @throws {Error} If the corresponding simctl subcommand command
+     *                 returns non-zero return code.
+     * @throws {Error} If the `udid` instance property is unset
+     */
+    function openUrl(this: import("../simctl").default, url: string): Promise<import("teen_process").TeenProcessExecResult<any>>;
+}
+//# sourceMappingURL=openurl.d.ts.map
