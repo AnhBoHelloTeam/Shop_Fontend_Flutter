@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:shop_frontend/screens/CategoriesScreen.dart';
+import 'package:shop_frontend/screens/HotBuyProducts.dart';
 import 'package:shop_frontend/screens/OrderHistory_screen.dart';
 import 'package:shop_frontend/screens/user_sceen.dart';
 import '../services/product_service.dart';
@@ -19,6 +20,7 @@ class _HomeScreenState extends State<HomeScreen> {
   bool isLoading = true;
   final ProductService productService = ProductService();
   final TextEditingController _searchController = TextEditingController();
+  String? authToken;
 
   String selectedCategory = '';
   String searchQuery = '';
@@ -26,7 +28,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-
+    _loadAuthToken();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final args = ModalRoute.of(context)?.settings.arguments;
       if (args is String) {
@@ -39,6 +41,15 @@ class _HomeScreenState extends State<HomeScreen> {
 
     loadCategories();
     loadProducts();
+  }
+
+  Future<void> _loadAuthToken() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('authToken') ?? '';
+    print('🔍 HomeScreen authToken: "$token"');
+    setState(() {
+      authToken = token;
+    });
   }
 
   Future<void> loadCategories() async {
@@ -73,46 +84,43 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> addToCart(String productId) async {
-  final prefs = await SharedPreferences.getInstance();
-  final token = prefs.getString('authToken') ?? '';
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('authToken') ?? '';
 
-  // Nếu chưa đăng nhập, hiện cảnh báo
-  if (token.isEmpty) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text("Vui lòng đăng nhập để mua hàng."),
-        action: SnackBarAction(
-          label: "Đăng nhập",
-          onPressed: () {
-            Navigator.pushReplacementNamed(context, '/'); // hoặc '/login' tùy route bạn dùng
-          },
+    if (token.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("Vui lòng đăng nhập để mua hàng."),
+          action: SnackBarAction(
+            label: "Đăng nhập",
+            onPressed: () {
+              Navigator.pushReplacementNamed(context, '/');
+            },
+          ),
         ),
-      ),
+      );
+      return;
+    }
+
+    final response = await http.post(
+      Uri.parse("https://shop-backend-nodejs.onrender.com/api/cart/add"),
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer $token"
+      },
+      body: jsonEncode({"productId": productId, "quantity": 1}),
     );
-    return;
+
+    if (response.statusCode == 200) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Đã thêm sản phẩm vào giỏ hàng")),
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text("Không thể thêm vào giỏ hàng. Vui lòng thử lại.")),
+      );
+    }
   }
-
-  // Nếu đã đăng nhập, tiếp tục thêm vào giỏ hàng
-  final response = await http.post(
-    Uri.parse("https://shop-backend-nodejs.onrender.com/api/cart/add"),
-    headers: {
-      "Content-Type": "application/json",
-      "Authorization": "Bearer $token"
-    },
-    body: jsonEncode({"productId": productId, "quantity": 1}),
-  );
-
-  if (response.statusCode == 200) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text("Đã thêm sản phẩm vào giỏ hàng")),
-    );
-  } else {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text("Không thể thêm vào giỏ hàng. Vui lòng thử lại.")),
-    );
-  }
-}
-
 
   void _showLogoutDialog() {
     showDialog(
@@ -142,31 +150,29 @@ class _HomeScreenState extends State<HomeScreen> {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: Colors.orange,
-        //////// thêm test key để test ///////////////
         title: TextField(
-            key: Key('searchTextField'), // ← thêm dòng này
-            controller: _searchController,
-            decoration: InputDecoration(
-              hintText: "Tìm kiếm sản phẩm...",
-              prefixIcon: Icon(Icons.search),
-              filled: true,
-              fillColor: Colors.white,
-              border: OutlineInputBorder(
-                borderRadius: BorderRadius.circular(30),
-                borderSide: BorderSide.none,
-              ),
+          key: Key('searchTextField'),
+          controller: _searchController,
+          decoration: InputDecoration(
+            hintText: "Tìm kiếm sản phẩm...",
+            prefixIcon: Icon(Icons.search),
+            filled: true,
+            fillColor: Colors.white,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(30),
+              borderSide: BorderSide.none,
             ),
-            onChanged: (value) {
-              setState(() {
-                searchQuery = value;
-                loadProducts();
-              });
-            },
           ),
-  /////// thêm test key để tết /////
+          onChanged: (value) {
+            setState(() {
+              searchQuery = value;
+              loadProducts();
+            });
+          },
+        ),
         actions: [
           IconButton(
-            key: Key('cartIconButton'), // ← Key xem gio hang
+            key: Key('cartIconButton'),
             icon: Icon(Icons.shopping_cart),
             onPressed: () => Navigator.pushNamed(context, '/cart'),
           ),
@@ -175,7 +181,6 @@ class _HomeScreenState extends State<HomeScreen> {
             onPressed: _showLogoutDialog,
           ),
         ],
-
       ),
       body: SafeArea(
         child: _currentIndex == 0
@@ -202,6 +207,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         }).toList(),
                       ),
                     ),
+                    HotBuyProducts(),
                     isLoading
                         ? Center(child: CircularProgressIndicator())
                         : LayoutBuilder(
@@ -225,7 +231,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 itemBuilder: (context, index) {
                                   final product = products[index];
                                   return Card(
-                                    key: Key('productCard_$index'), //////////////////////////////////////////////////// thêm key để test seach
+                                    key: Key('productCard_$index'),
                                     elevation: 3,
                                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
                                     child: Column(
@@ -264,7 +270,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                                                 children: [
                                                   TextButton(
-                                                     key: Key('detailButton_$index'), // 👈 key nút chi tiết
+                                                    key: Key('detailButton_$index'),
                                                     onPressed: () => Navigator.pushNamed(context, '/product_detail',
                                                         arguments: product),
                                                     child: Text("Chi tiết", style: TextStyle(color: Colors.blue)),
@@ -291,7 +297,7 @@ class _HomeScreenState extends State<HomeScreen> {
             : _currentIndex == 1
                 ? CategoriesScreen()
                 : _currentIndex == 2
-                    ? OrderHistoryPage()
+                    ? OrderHistoryScreen()
                     : AccountPage(),
       ),
       bottomNavigationBar: BottomNavigationBar(
@@ -312,7 +318,7 @@ class _HomeScreenState extends State<HomeScreen> {
           BottomNavigationBarItem(icon: Icon(Icons.category), label: "Danh mục"),
           BottomNavigationBarItem(icon: Icon(Icons.history), label: "Lịch sử"),
           BottomNavigationBarItem(
-            key: Key('accountIconButton'), // Thêm key cho icon Tài khoản
+            key: Key('accountIconButton'),
             icon: Icon(Icons.person),
             label: "Tài khoản",
           ),
