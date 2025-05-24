@@ -1,6 +1,6 @@
 name: shop_frontend
 description: "A new Flutter project."
-publish_to: 'none' # Remove this line if you wish to publish to pub.dev
+publish_to: 'none'
 
 version: 1.0.0+1
 
@@ -27,6 +27,7 @@ dependencies:
   shimmer: ^3.0.0
   animate_do: ^4.2.0
   google_fonts: ^6.2.1
+  qr_code_scanner: ^1.0.1
 
 dev_dependencies:
   flutter_test:
