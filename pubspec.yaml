@@ -20,11 +20,13 @@ dependencies:
   jwt_decoder: ^2.0.1
   flutter_screenutil: ^5.9.0
   another_flushbar: ^1.10.29
-  excel: ^4.0.6
   path_provider: ^2.1.2
   intl: ^0.20.2
-  socket_io_client: ^2.0.0
+  socket_io_client: ^3.1.2
   cached_network_image: ^3.2.3
+  shimmer: ^3.0.0
+  animate_do: ^4.2.0
+  google_fonts: ^6.2.1
 
 dev_dependencies:
   flutter_test:
