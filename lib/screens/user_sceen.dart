@@ -13,7 +13,7 @@ import 'package:shop_frontend/screens/Crud_admin/AddProductPage.dart';
 import 'package:shop_frontend/screens/Crud_admin/ProductListPage.dart';
 import 'package:shop_frontend/screens/Listuser/UserListPage.dart';
 import 'package:shop_frontend/screens/OrderHistory_screen.dart';
-import 'package:shop_frontend/screens/OrderStatusScreen.dart'; // Added import
+import 'package:shop_frontend/screens/OrderStatusScreen.dart';
 import 'package:shop_frontend/screens/admin_order_management_screen.dart';
 import 'package:shop_frontend/screens/discount_management_screen.dart';
 import 'package:shop_frontend/services/token_utils.dart';
@@ -40,6 +40,7 @@ class _AccountPageState extends State<AccountPage> {
     super.initState();
     _getUserInfo();
     _initSocket();
+    _fetchNotifications();
   }
 
   void _initSocket() {
@@ -57,7 +58,7 @@ class _AccountPageState extends State<AccountPage> {
     socket.on('notification', (data) {
       if (mounted) {
         setState(() {
-          notifications.add(data);
+          notifications.insert(0, data);
         });
       }
     });
@@ -69,6 +70,53 @@ class _AccountPageState extends State<AccountPage> {
     socket.onDisconnect((_) {
       if (kDebugMode) debugPrint('📡 Disconnected from socket');
     });
+  }
+
+  Future<void> _fetchNotifications() async {
+    if (!mounted || authToken == null || authToken!.isEmpty) return;
+
+    const maxRetries = 3;
+    int attempt = 0;
+    const timeoutSeconds = 5;
+
+    while (attempt < maxRetries) {
+      final client = http.Client();
+      try {
+        final response = await client
+            .get(
+              Uri.parse("https://shop-backend-nodejs.onrender.com/api/notifications"),
+              headers: {'Authorization': 'Bearer $authToken'},
+            )
+            .timeout(const Duration(seconds: timeoutSeconds));
+
+        if (kDebugMode) debugPrint('📡 Fetch notifications response: ${response.statusCode}, attempt ${attempt + 1}');
+
+        if (response.statusCode == 200) {
+          final data = jsonDecode(response.body);
+          if (mounted) {
+            setState(() {
+              notifications = data;
+            });
+          }
+          client.close();
+          return;
+        } else {
+          attempt++;
+          if (attempt >= maxRetries && mounted) {
+            _showFlushbar('Lỗi khi lấy thông báo', Colors.red);
+          }
+        }
+      } catch (e) {
+        if (kDebugMode) debugPrint('🔥 Error fetching notifications (attempt ${attempt + 1}): $e');
+        attempt++;
+        if (attempt >= maxRetries && mounted) {
+          _showFlushbar('Lỗi kết nối khi lấy thông báo', Colors.red);
+        }
+      } finally {
+        client.close();
+      }
+      await Future.delayed(const Duration(seconds: 2));
+    }
   }
 
   Future<void> _getUserInfo() async {
@@ -521,9 +569,18 @@ class _AccountPageState extends State<AccountPage> {
                     context: context,
                     builder: (context) => AlertDialog(
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
-                      title: Text(
-                        'Thông báo',
-                        style: GoogleFonts.poppins(fontSize: 16.sp, fontWeight: FontWeight.bold),
+                      title: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Text(
+                            'Thông báo',
+                            style: GoogleFonts.poppins(fontSize: 16.sp, fontWeight: FontWeight.bold),
+                          ),
+                          IconButton(
+                            icon: Icon(Icons.refresh, size: 20.sp),
+                            onPressed: _fetchNotifications,
+                          ),
+                        ],
                       ),
                       content: notifications.isEmpty
                           ? Text(
@@ -532,17 +589,27 @@ class _AccountPageState extends State<AccountPage> {
                             )
                           : SizedBox(
                               width: double.maxFinite,
+                              height: 400.h,
                               child: ListView.builder(
                                 shrinkWrap: true,
                                 itemCount: notifications.length,
                                 itemBuilder: (context, index) {
                                   final notification = notifications[index];
+                                  final isRead = notification['isRead'] ?? false;
                                   return FadeIn(
                                     delay: Duration(milliseconds: index * 100),
                                     child: ListTile(
+                                      leading: Icon(
+                                        isRead ? Icons.check_circle : Icons.notifications_active,
+                                        color: isRead ? Colors.green : Colors.red,
+                                        size: 20.sp,
+                                      ),
                                       title: Text(
                                         notification['message'] ?? 'Không rõ',
-                                        style: GoogleFonts.poppins(fontSize: 14.sp),
+                                        style: GoogleFonts.poppins(
+                                          fontSize: 14.sp,
+                                          fontWeight: isRead ? FontWeight.normal : FontWeight.bold,
+                                        ),
                                       ),
                                       subtitle: Text(
                                         notification['createdAt'] != null
@@ -551,13 +618,8 @@ class _AccountPageState extends State<AccountPage> {
                                             : 'Không rõ',
                                         style: GoogleFonts.poppins(fontSize: 12.sp, color: Colors.grey),
                                       ),
-                                      trailing: Icon(
-                                        notification['isRead'] ? Icons.check_circle : Icons.circle,
-                                        color: notification['isRead'] ? Colors.green : Colors.red,
-                                        size: 20.sp,
-                                      ),
                                       onTap: () async {
-                                        if (!notification['isRead']) {
+                                        if (!isRead) {
                                           const maxRetries = 3;
                                           int attempt = 0;
                                           const timeoutSeconds = 5;
@@ -651,7 +713,10 @@ class _AccountPageState extends State<AccountPage> {
         ],
       ),
       body: RefreshIndicator(
-        onRefresh: _getUserInfo,
+        onRefresh: () async {
+          await _getUserInfo();
+          await _fetchNotifications();
+        },
         color: Colors.orange,
         child: isLoading
             ? const Center(child: CircularProgressIndicator(color: Colors.orange))
