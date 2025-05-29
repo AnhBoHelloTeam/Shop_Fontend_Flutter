@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_screenutil/flutter_screenutil.dart';
+import 'package:shop_frontend/screens/TKBank/WalletScreen.dart';
 import 'package:socket_io_client/socket_io_client.dart' as IO;
 import 'package:animate_do/animate_do.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -331,6 +332,13 @@ class _AccountPageState extends State<AccountPage> {
     Navigator.pushNamed(context, '/return-policy');
   }
 
+  void _navigateToWallet() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const WalletScreen()),
+    );
+  }
+
   void _showAccessDenied() {
     _showFlushbar("Bạn không có quyền truy cập", Colors.red);
   }
@@ -529,12 +537,6 @@ class _AccountPageState extends State<AccountPage> {
   }
 
   @override
-  void dispose() {
-    socket.disconnect();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
@@ -560,6 +562,10 @@ class _AccountPageState extends State<AccountPage> {
           ),
         ),
         actions: [
+          IconButton(
+            icon: Icon(Icons.account_balance_wallet, size: 24.sp),
+            onPressed: _navigateToWallet,
+          ),
           Stack(
             children: [
               IconButton(
@@ -902,5 +908,11 @@ class _AccountPageState extends State<AccountPage> {
         ),
       ),
     );
+  }
+
+  @override
+  void dispose() {
+    socket.disconnect();
+    super.dispose();
   }
 }
