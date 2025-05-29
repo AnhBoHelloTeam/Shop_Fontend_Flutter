@@ -9,7 +9,9 @@ import 'package:animate_do/animate_do.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:another_flushbar/flushbar.dart';
 import 'package:intl/intl.dart';
+import 'package:shop_frontend/screens/return_request_screen.dart';
 
+// Widget hiển thị lịch sử đơn hàng
 class OrderHistoryScreen extends StatefulWidget {
   final VoidCallback? onDeliveryConfirmed;
 
@@ -21,6 +23,7 @@ class OrderHistoryScreen extends StatefulWidget {
 
 class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
   List<dynamic> orders = [];
+  List<dynamic> returnRequests = [];
   bool isLoading = true;
   String errorMessage = '';
   String? userId;
@@ -32,6 +35,7 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
     _checkLoginAndFetchHistory();
   }
 
+  // Kiểm tra đăng nhập và lấy lịch sử
   Future<void> _checkLoginAndFetchHistory() async {
     final prefs = await SharedPreferences.getInstance();
     final authToken = prefs.getString('authToken') ?? '';
@@ -70,314 +74,235 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
       return;
     }
 
-    // Lấy userId và membershipTier
     try {
-      const timeoutSeconds = 5;
       final client = http.Client();
       final response = await client
           .get(
             Uri.parse('https://shop-backend-nodejs.onrender.com/api/users/me'),
             headers: {"Authorization": "Bearer $authToken"},
           )
-          .timeout(const Duration(seconds: timeoutSeconds));
+          .timeout(const Duration(seconds: 5));
       client.close();
 
       if (response.statusCode == 200) {
         final userData = jsonDecode(response.body);
         userId = userData['_id'];
         membershipTier = userData['membershipTier'] ?? 'Member';
-        if (kDebugMode) debugPrint('📡 Fetched userId: $userId, membershipTier: $membershipTier');
+        if (kDebugMode) debugPrint('📡 Lấy userId: $userId, membershipTier: $membershipTier');
       }
     } catch (e) {
-      if (kDebugMode) debugPrint('🔥 Error fetching userId: $e');
+      if (kDebugMode) debugPrint('🔥 Lỗi lấy userId: $e');
     }
 
-    _fetchOrderHistory(authToken);
+    await _fetchOrderHistory(authToken);
+    await _fetchReturnRequests(authToken);
   }
 
+  // Lấy lịch sử đơn hàng
   Future<void> _fetchOrderHistory(String authToken) async {
     if (!mounted) return;
     setState(() => isLoading = true);
 
-    const maxRetries = 3;
-    int attempt = 0;
-    const timeoutSeconds = 5;
-
-    // Load cached data
-    final prefs = await SharedPreferences.getInstance();
-    final cachedOrders = prefs.getString('order_history');
-    if (cachedOrders != null) {
-      try {
-        final cachedData = jsonDecode(cachedOrders) as List<dynamic>;
-        if (mounted) {
-          setState(() {
-            orders = cachedData;
-            isLoading = false;
-          });
-          if (kDebugMode) debugPrint('📡 Loaded ${orders.length} orders from cache');
-        }
-      } catch (e) {
-        if (kDebugMode) debugPrint('🔥 Error decoding cached orders: $e');
-      }
-    }
-
-    while (attempt <= maxRetries) {
-      try {
-        final client = http.Client();
-        final response = await client
-            .get(
-              Uri.parse("https://shop-backend-nodejs.onrender.com/api/orders/history"),
-              headers: {"Authorization": "Bearer $authToken"},
-            )
-            .timeout(const Duration(seconds: timeoutSeconds));
-        client.close();
-
-        if (kDebugMode) debugPrint('📡 Order history response: ${response.statusCode}, attempt ${attempt + 1}');
-
-        if (response.statusCode == 200) {
-          final data = jsonDecode(response.body);
-          if (data is List) {
-            await prefs.setString('order_history', response.body);
-            if (mounted) {
-              setState(() {
-                orders = data;
-                isLoading = false;
-                errorMessage = '';
-              });
-            }
-          } else {
-            if (mounted) {
-              setState(() {
-                errorMessage = 'Dữ liệu đơn hàng không đúng định dạng';
-                isLoading = false;
-              });
-            }
-          }
-          return;
-        } else {
-          if (kDebugMode) debugPrint('⚠️ Failed to fetch order history: ${response.statusCode}');
-          attempt++;
-          if (attempt > maxRetries) {
-            if (mounted) {
-              setState(() {
-                errorMessage = 'Không thể lấy lịch sử đơn hàng';
-                isLoading = false;
-              });
-            }
-            return;
-          }
-          await Future.delayed(const Duration(seconds: 2));
-        }
-      } catch (e) {
-        if (kDebugMode) debugPrint('🔥 Error fetching order history (attempt ${attempt + 1}): $e');
-        attempt++;
-        if (attempt > maxRetries) {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final cachedOrders = prefs.getString('order_history');
+      if (cachedOrders != null) {
+        try {
+          final cachedData = jsonDecode(cachedOrders);
           if (mounted) {
             setState(() {
-              errorMessage = 'Lỗi kết nối đến server';
-              isLoading = false;
+              orders = cachedData;
             });
+            if (kDebugMode) debugPrint('📡 Load ${orders.length} đơn hàng từ cache');
           }
-          return;
+        } catch (e) {
+          if (kDebugMode) debugPrint('🔥 Lỗi giải mã cache: $e');
         }
-        await Future.delayed(const Duration(seconds: 2));
+      }
+
+      final client = http.Client();
+      final response = await client
+          .get(
+            Uri.parse("https://shop-backend-nodejs.onrender.com/api/orders/history"),
+            headers: {"Authorization": "Bearer $authToken"},
+          )
+          .timeout(const Duration(seconds: 5));
+      client.close();
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        await prefs.setString('order_history', response.body);
+        if (mounted) {
+          setState(() {
+            orders = data;
+            isLoading = false;
+            errorMessage = '';
+          });
+        }
+      } else {
+        if (mounted) {
+          setState(() {
+            errorMessage = 'Không thể lấy lịch sử đơn hàng';
+            isLoading = false;
+          });
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) debugPrint('🔥 Lỗi lấy lịch sử đơn: $e');
+      if (mounted) {
+        setState(() {
+          errorMessage = 'Lỗi kết nối server';
+          isLoading = false;
+        });
       }
     }
   }
 
+  // Lấy danh sách yêu cầu trả hàng
+  Future<void> _fetchReturnRequests(String authToken) async {
+    try {
+      final client = http.Client();
+      final response = await client
+          .get(
+            Uri.parse('https://shop-backend-nodejs.onrender.com/api/orders/return-requests'),
+            headers: {'Authorization': 'Bearer $authToken'},
+          )
+          .timeout(const Duration(seconds: 5));
+      client.close();
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        if (mounted) {
+          setState(() {
+            returnRequests = data;
+          });
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) debugPrint('🔥 Lỗi lấy yêu cầu trả hàng: $e');
+    }
+  }
+
+  // Kiểm tra trạng thái trả hàng
+  Map<String, dynamic>? _getReturnRequest(String orderId) {
+    try {
+      return returnRequests.firstWhere(
+        (request) => request['order']['_id'] == orderId,
+        orElse: () => null,
+      );
+    } catch (e) {
+      return null;
+    }
+  }
+
+  // Kiểm tra đánh giá sản phẩm
   Future<bool> _hasReviewed(String productId, String authToken) async {
-    const maxRetries = 2;
-    int attempt = 0;
-    const timeoutSeconds = 5;
+    try {
+      final client = http.Client();
+      final response = await client
+          .get(
+            Uri.parse('https://shop-backend-nodejs.onrender.com/api/orders/review/$productId'),
+            headers: {"Authorization": "Bearer $authToken"},
+          )
+          .timeout(const Duration(seconds: 5));
+      client.close();
 
-    while (attempt <= maxRetries) {
-      try {
-        final client = http.Client();
-        final response = await client
-            .get(
-              Uri.parse('https://shop-backend-nodejs.onrender.com/api/orders/review/$productId'),
-              headers: {"Authorization": "Bearer $authToken"},
-            )
-            .timeout(const Duration(seconds: timeoutSeconds));
-        client.close();
-
-        if (response.statusCode == 200) {
-          final reviews = jsonDecode(response.body);
-          if (reviews is List && userId != null) {
-            return reviews.any((review) => review['userId'] == userId);
-          }
-        }
-        return false;
-      } catch (e) {
-        if (kDebugMode) debugPrint('🔥 Error checking review status (attempt ${attempt + 1}): $e');
-        attempt++;
-        if (attempt > maxRetries) return false;
-        await Future.delayed(const Duration(seconds: 1));
+      if (response.statusCode == 200) {
+        final reviews = jsonDecode(response.body);
+        return reviews.any((review) => review['userId'] == userId);
       }
+      return false;
+    } catch (e) {
+      if (kDebugMode) debugPrint('🔥 Lỗi kiểm tra đánh giá: $e');
+      return false;
     }
-    return false;
   }
 
+  // Xác nhận nhận hàng
   Future<void> _confirmDelivery(String orderId) async {
-    const maxRetries = 3;
-    int attempt = 0;
-    const timeoutSeconds = 5;
-
     try {
       final prefs = await SharedPreferences.getInstance();
       final authToken = prefs.getString('authToken') ?? '';
+      final client = http.Client();
+      final response = await client
+          .put(
+            Uri.parse("https://shop-backend-nodejs.onrender.com/api/orders/deliver/$orderId"),
+            headers: {"Authorization": "Bearer $authToken"},
+          )
+          .timeout(const Duration(seconds: 5));
+      client.close();
 
-      while (attempt <= maxRetries) {
-        try {
-          final client = http.Client();
-          final response = await client
-              .put(
-                Uri.parse("https://shop-backend-nodejs.onrender.com/api/orders/deliver/$orderId"),
-                headers: {"Authorization": "Bearer $authToken"},
-              )
-              .timeout(const Duration(seconds: timeoutSeconds));
-          client.close();
-
-          if (response.statusCode == 200) {
-            _showFlushbar('✅ Xác nhận nhận hàng thành công', Colors.green);
-            final userResponse = await client.get(
-              Uri.parse('https://shop-backend-nodejs.onrender.com/api/users/me'),
-              headers: {"Authorization": "Bearer $authToken"},
-            );
-            if (userResponse.statusCode == 200) {
-              final userData = jsonDecode(userResponse.body);
-              if (mounted) {
-                setState(() {
-                  membershipTier = userData['membershipTier'] ?? 'Member';
-                });
-                if (kDebugMode) debugPrint('📡 Updated membershipTier: $membershipTier');
-              }
-            }
-            await _fetchOrderHistory(authToken);
-            if (widget.onDeliveryConfirmed != null) {
-              widget.onDeliveryConfirmed!();
-            }
-            return;
-          } else {
-            if (kDebugMode) debugPrint('⚠️ Failed to confirm delivery: ${response.statusCode}');
-            _showFlushbar('Không thể xác nhận nhận hàng', Colors.red);
-            return;
-          }
-        } catch (e) {
-          if (kDebugMode) debugPrint('🔥 Error confirming delivery (attempt ${attempt + 1}): $e');
-          attempt++;
-          if (attempt > maxRetries) {
-            _showFlushbar('Lỗi server', Colors.red);
-            return;
-          }
-          await Future.delayed(const Duration(seconds: 2));
+      if (response.statusCode == 200) {
+        _showFlushbar('✅ Xác nhận nhận hàng thành công', Colors.green);
+        await _fetchOrderHistory(authToken);
+        if (widget.onDeliveryConfirmed != null) {
+          widget.onDeliveryConfirmed!();
         }
+      } else {
+        _showFlushbar('Không thể xác nhận nhận hàng', Colors.red);
       }
     } catch (e) {
-      if (kDebugMode) debugPrint('🔥 Error confirming delivery: $e');
+      if (kDebugMode) debugPrint('🔥 Lỗi xác nhận giao hàng: $e');
       _showFlushbar('Lỗi server', Colors.red);
     }
   }
 
+  // Chuyển đến màn hình yêu cầu trả hàng
   Future<void> _requestReturn(String orderId) async {
-    const maxRetries = 3;
-    int attempt = 0;
-    const timeoutSeconds = 5;
+    final order = orders.firstWhere((o) => o['_id'] == orderId, orElse: () => null);
+    if (order == null) {
+      _showFlushbar('Không tìm thấy đơn hàng', Colors.red);
+      return;
+    }
 
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final authToken = prefs.getString('authToken') ?? '';
-
-      while (attempt <= maxRetries) {
-        try {
-          final client = http.Client();
-          final response = await client
-              .put(
-                Uri.parse("https://shop-backend-nodejs.onrender.com/api/orders/return/$orderId"),
-                headers: {"Authorization": "Bearer $authToken"},
-              )
-              .timeout(const Duration(seconds: timeoutSeconds));
-          client.close();
-
-          if (response.statusCode == 200) {
-            _showFlushbar('✅ Yêu cầu trả hàng thành công', Colors.green);
-            await _fetchOrderHistory(authToken);
-            return;
-          } else {
-            if (kDebugMode) debugPrint('⚠️ Failed to request return: ${response.statusCode}');
-            _showFlushbar('Không thể yêu cầu trả hàng', Colors.red);
-            return;
-          }
-        } catch (e) {
-          if (kDebugMode) debugPrint('🔥 Error requesting return (attempt ${attempt + 1}): $e');
-          attempt++;
-          if (attempt > maxRetries) {
-            _showFlushbar('Lỗi server', Colors.red);
-            return;
-          }
-          await Future.delayed(const Duration(seconds: 2));
-        }
-      }
-    } catch (e) {
-      if (kDebugMode) debugPrint('🔥 Error requesting return: $e');
-      _showFlushbar('Lỗi server', Colors.red);
+    if (mounted) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (context) => ReturnRequestScreen(
+            orderId: orderId,
+            items: List<Map<String, dynamic>>.from(order['items'] ?? []),
+          ),
+        ),
+      );
     }
   }
 
+  // Gửi đánh giá
   Future<void> _submitReview(String productId, int rating, String comment) async {
-    const maxRetries = 3;
-    int attempt = 0;
-    const timeoutSeconds = 5;
-
     try {
       final prefs = await SharedPreferences.getInstance();
       final authToken = prefs.getString('authToken') ?? '';
+      final client = http.Client();
+      final response = await client
+          .post(
+            Uri.parse("https://shop-backend-nodejs.onrender.com/api/orders/review"),
+            headers: {
+              "Authorization": "Bearer $authToken",
+              "Content-Type": "application/json",
+            },
+            body: jsonEncode({
+              "productId": productId,
+              "rating": rating,
+              "comment": comment,
+            }),
+          )
+          .timeout(const Duration(seconds: 5));
+      client.close();
 
-      while (attempt <= maxRetries) {
-        try {
-          final client = http.Client();
-          final response = await client
-              .post(
-                Uri.parse("https://shop-backend-nodejs.onrender.com/api/orders/review"),
-                headers: {
-                  "Authorization": "Bearer $authToken",
-                  "Content-Type": "application/json",
-                },
-                body: jsonEncode({
-                  "productId": productId,
-                  "rating": rating,
-                  "comment": comment,
-                }),
-              )
-              .timeout(const Duration(seconds: timeoutSeconds));
-          client.close();
-
-          if (response.statusCode == 201) {
-            _showFlushbar('✅ Đánh giá thành công', Colors.green);
-            await prefs.remove('reviews_$productId');
-            await _fetchOrderHistory(authToken);
-            return;
-          } else {
-            if (kDebugMode) debugPrint('⚠️ Failed to submit review: ${response.statusCode}');
-            _showFlushbar('Không thể gửi đánh giá', Colors.red);
-            return;
-          }
-        } catch (e) {
-          if (kDebugMode) debugPrint('🔥 Error submitting review (attempt ${attempt + 1}): $e');
-          attempt++;
-          if (attempt > maxRetries) {
-            _showFlushbar('Lỗi server', Colors.red);
-            return;
-          }
-          await Future.delayed(const Duration(seconds: 2));
-        }
+      if (response.statusCode == 201) {
+        _showFlushbar('✅ Đánh giá thành công', Colors.green);
+        await _fetchOrderHistory(authToken);
+      } else {
+        _showFlushbar('Không thể gửi đánh giá', Colors.red);
       }
     } catch (e) {
-      if (kDebugMode) debugPrint('🔥 Error submitting review: $e');
+      if (kDebugMode) debugPrint('🔥 Lỗi gửi đánh giá: $e');
       _showFlushbar('Lỗi server', Colors.red);
     }
   }
 
+  // Hiển thị thông báo
   void _showFlushbar(String message, Color backgroundColor) {
     Flushbar(
       message: message,
@@ -391,6 +316,7 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
     ).show(context);
   }
 
+  // Hiển thị dialog đánh giá
   void _showReviewDialog(String productId, String productName) {
     int? rating;
     final commentController = TextEditingController();
@@ -401,7 +327,7 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
         builder: (context, setDialogState) => AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12.r)),
           title: Text(
-            'Đánh giá sản phẩm: $productName',
+            'Đánh giá: $productName',
             style: GoogleFonts.poppins(fontSize: 16.sp, fontWeight: FontWeight.bold),
           ),
           content: Column(
@@ -413,7 +339,6 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
                 style: GoogleFonts.poppins(fontSize: 14.sp),
               ),
               Row(
-                mainAxisAlignment: MainAxisAlignment.start,
                 children: List.generate(5, (index) {
                   return IconButton(
                     icon: Icon(
@@ -471,7 +396,18 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
     );
   }
 
-  String _getStatusText(String status) {
+  // Chuyển trạng thái sang tiếng Việt
+  String _getStatusText(String status, Map<String, dynamic>? returnRequest) {
+    if (status == 'delivered' && returnRequest != null) {
+      switch (returnRequest['status']) {
+        case 'pending':
+          return 'Đang chờ duyệt trả hàng';
+        case 'approved':
+          return 'Trả hàng được chấp nhận';
+        case 'rejected':
+          return 'Trả hàng bị từ chối';
+      }
+    }
     switch (status) {
       case 'pending':
         return 'Chờ xác nhận';
@@ -490,6 +426,7 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
     }
   }
 
+  // Skeleton loader
   Widget _buildSkeletonLoader() {
     return Shimmer.fromColors(
       baseColor: Colors.grey[300]!,
@@ -562,7 +499,10 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
             );
           }
           return RefreshIndicator(
-            onRefresh: () => _fetchOrderHistory(authToken),
+            onRefresh: () async {
+              await _fetchOrderHistory(authToken);
+              await _fetchReturnRequests(authToken);
+            },
             color: Colors.orange,
             child: isLoading
                 ? _buildSkeletonLoader()
@@ -604,7 +544,10 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
                                     itemCount: orders.length,
                                     itemBuilder: (context, index) {
                                       final order = orders[index];
-                                      final createdAt = DateTime.parse(order['createdAt'] ?? DateTime.now().toIso8601String()).toLocal();
+                                      final createdAt = DateTime.parse(
+                                        order['createdAt'] ?? DateTime.now().toIso8601String(),
+                                      ).toLocal();
+                                      final returnRequest = _getReturnRequest(order['_id']);
                                       return FadeInUp(
                                         delay: Duration(milliseconds: index * 100),
                                         child: Card(
@@ -629,8 +572,15 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
                                                   style: GoogleFonts.poppins(fontSize: 14.sp),
                                                 ),
                                                 Text(
-                                                  'Trạng thái: ${_getStatusText(order['status'] ?? 'unknown')}',
-                                                  style: GoogleFonts.poppins(fontSize: 14.sp, color: Colors.blue),
+                                                  'Trạng thái: ${_getStatusText(order['status'], returnRequest)}',
+                                                  style: GoogleFonts.poppins(
+                                                    fontSize: 14.sp,
+                                                    color: returnRequest != null && returnRequest['status'] == 'pending'
+                                                        ? Colors.orange
+                                                        : returnRequest != null && returnRequest['status'] == 'approved'
+                                                            ? Colors.green
+                                                            : Colors.blue,
+                                                  ),
                                                 ),
                                                 Text(
                                                   'Tổng giá: ${(order['totalPrice']?.toDouble() ?? 0.0).toStringAsFixed(2)} đ',
@@ -694,7 +644,7 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
                                                                   icon: Icon(Icons.rate_review, size: 20.sp, color: Colors.blue),
                                                                   onPressed: () => _showReviewDialog(
                                                                     product['_id'] ?? '',
-                                                                    product['name'] ?? '',
+                                                                    product['name'] ?? 'Không rõ',
                                                                   ),
                                                                 )
                                                               : isReviewed
@@ -736,7 +686,7 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
                                                       ),
                                                     ),
                                                   ),
-                                                if (order['status'] == 'delivered')
+                                                if (order['status'] == 'delivered' && returnRequest == null)
                                                   Padding(
                                                     padding: EdgeInsets.only(top: 8.h),
                                                     child: ZoomIn(
@@ -756,6 +706,25 @@ class _OrderHistoryScreenState extends State<OrderHistoryScreen> {
                                                             color: Colors.white,
                                                           ),
                                                         ),
+                                                      ),
+                                                    ),
+                                                  ),
+                                                if (returnRequest != null)
+                                                  Padding(
+                                                    padding: EdgeInsets.only(top: 8.h),
+                                                    child: Text(
+                                                      returnRequest['status'] == 'pending'
+                                                          ? 'Yêu cầu trả hàng đang chờ xử lý'
+                                                          : returnRequest['status'] == 'approved'
+                                                              ? 'Yêu cầu trả hàng đã được chấp nhận'
+                                                              : 'Yêu cầu trả hàng bị từ chối',
+                                                      style: GoogleFonts.poppins(
+                                                        fontSize: 14.sp,
+                                                        color: returnRequest['status'] == 'pending'
+                                                            ? Colors.orange
+                                                            : returnRequest['status'] == 'approved'
+                                                                ? Colors.green
+                                                                : Colors.red,
                                                       ),
                                                     ),
                                                   ),
